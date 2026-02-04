@@ -33,9 +33,8 @@ def p_min(theta, n_p):
     # Density of minimum of n_p i.i.d. U[0,pi]
     return n_p * (1/np.pi) * (1 - theta/np.pi)**(n_p - 1)
 
-def a_raw(theta):
-    # Un-normalised alignment weight (largest at theta=0)
-    return (np.pi - theta)
+def a(theta):
+    return (2/np.pi**2) * (np.pi - theta)
 
 def compute_DTER(n_p, l_p, g_val, d_crit):
     if l_p < d_crit:
@@ -46,31 +45,21 @@ def compute_DTER(n_p, l_p, g_val, d_crit):
     # Detection probability for uniform angles
     P_det = 1 - (1 - theta_crit/np.pi)**n_p
 
-    # E[a_raw(theta_min) | det] with theta_min truncated to [0, theta_crit]
     if P_det > 0:
-        num_det, _ = quad(lambda th: a_raw(th) * p_min(th, n_p), 0, theta_crit)
-        E_araw_det = num_det / P_det
+        EA_det, _ = quad(lambda th: a(th) * p_min(th, n_p), 0, theta_crit)
+        EA_det = EA_det / P_det
     else:
-        E_araw_det = 0.0
+        EA_det = 0.0
 
-    # E[a_raw(Theta_rand)] with Theta_rand ~ U[0, pi]
-    E_araw_rand, _ = quad(lambda th: a_raw(th) * (1/np.pi), 0, np.pi)
+    EA_rand, _ = quad(lambda th: a(th) * (1/np.pi), 0, np.pi)
 
-    # Mixture mean under the actual movement rule
-    E_araw_move = P_det * E_araw_det + (1 - P_det) * E_araw_rand
-
-    # Normalise so overall mean step multiplier is 1
-    # (preserves total movement capacity on average)
-    def a(theta):
-        return a_raw(theta) / E_araw_move if E_araw_move != 0 else 0.0
+    EA_move = P_det * EA_det + (1 - P_det) * EA_rand
+    d_avg = d * EA_move
 
     # Numerator: E[d_x] = g * ∫_{0}^{theta_crit} d*a(theta)*cos(theta)*p_min(theta) dtheta
     num_int, _ = quad(lambda th: a(th) * np.cos(th) * p_min(th, n_p), 0, theta_crit)
     numerator = g_val * d * num_int
 
-    # Denominator: membrane costs + movement energy with expected step length
-    # E[d_step] = d * E[a(Theta_move)] = d by construction (because we normalised)
-    d_avg = d
     denominator = (
         n_p * l_p**2
         + alpha_a * n_p**2 * l_p**2
