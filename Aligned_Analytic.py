@@ -26,6 +26,9 @@ k = 500 * np.sqrt(2)
 
 ############################# Helper functions #################################
 
+def g(beta, phi, k): 
+    return phi * (beta / k) * np.exp(-(beta / k)**2)
+
 def p_min(theta, n_p):
     # Density of minimum of n_p i.i.d. U[0,pi]
     return n_p * (1/np.pi) * (1 - theta/np.pi)**(n_p - 1)
