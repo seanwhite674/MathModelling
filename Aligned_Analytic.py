@@ -9,15 +9,12 @@ import os
 
 # Enable LaTeX rendering for all text elements
 mpl.rcParams.update({
-    "text.usetex": True,
+    "text.usetex": False,
     "font.family": "serif",
-    "font.serif": ["Computer Modern Roman"],
-    "axes.labelsize": 14,
-    "font.size": 12,
-    "legend.fontsize": 12,
-    "xtick.labelsize": 40,
-    "ytick.labelsize": 40
+    "font.serif": ["STIXGeneral"],
+    "mathtext.fontset": "stix",
 })
+
 
 ########################## Fixed model parameters ##############################
 
@@ -37,13 +34,15 @@ def g(beta, phi, k):
 def integrand(theta, n_p):
     return (1 / np.pi) * np.cos(theta) * (1 - (theta / np.pi))**(n_p - 1)*((np.pi - theta))*(2/np.pi**2)
 
-def denomintegrand1(theta, n_p):
+def detection(theta, n_p):
     return (np.pi - theta)*(1 - theta/np.pi)**(n_p-1)
 
-def denomintegrand2(theta, n_p):
-    return (np.pi - theta)*(theta/np.pi)**(n_p-1)
+def no_detection(theta, n_p):
+    return (1 - theta/np.pi)**(n_p-1)
 
 
+def Alignment(theta, n_p):
+    return ((np.pi - theta)/np.pi)
 
 
 def compute_DTER(n_p, l_p, g_val, d_crit):
@@ -51,9 +50,12 @@ def compute_DTER(n_p, l_p, g_val, d_crit):
         return 0.0
     theta_crit = np.arccos(d_crit / l_p)
     integral, _ = quad(integrand, 0, theta_crit, args=(n_p,))
-    denomintegral1, _ = quad(denomintegrand1, 0, theta_crit, args=(n_p,)) 
-    denomintegral2, _ = quad(denomintegrand2, theta_crit, np.pi, args=(n_p,))
-    em = denomintegral1 + denomintegral2 
+    detection_integral, _ = quad(detection, 0, theta_crit, args=(n_p,)) 
+    no_detection_prob, _ = quad(no_detection, 0, theta_crit, args=(n_p,))
+    prefactor = (1 - no_detection_prob)
+    val, err = quad(Alignment, 0, np.pi, args=(n_p,))
+    no_detection_integral = prefactor * val
+    em = no_detection_integral + detection_integral
     numerator = g_val * d * n_p * integral
     denominator = n_p * l_p**2 + alpha_a * n_p**2 * l_p**2 + (2 / np.pi**2)*em*g_val
     return numerator / denominator if denominator != 0 else 0.0
