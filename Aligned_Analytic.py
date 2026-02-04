@@ -32,7 +32,7 @@ def g(beta, phi, k):
 
 
 def integrand(theta, n_p):
-    return (1 / np.pi) * np.cos(theta) * (1 - (theta / np.pi))**(n_p - 1)*((np.pi - theta))*(2/np.pi**2)
+    return (1 / np.pi) * np.cos(theta) * (1 - (theta / np.pi))**(n_p - 1)*((np.pi - theta))*(2/np.pi)
 
 def detection(theta, n_p):
     return (np.pi - theta)*(1 - theta/np.pi)**(n_p-1)
@@ -57,7 +57,7 @@ def compute_DTER(n_p, l_p, g_val, d_crit):
     no_detection_integral = prefactor * val
     em = no_detection_integral + detection_integral
     numerator = g_val * d * n_p * integral
-    denominator = n_p * l_p**2 + alpha_a * n_p**2 * l_p**2 + (2 / np.pi**2)*em*g_val
+    denominator = n_p * l_p**2 + alpha_a * n_p**2 * l_p**2 + (2 / np.pi)*em*g_val
     return numerator / denominator if denominator != 0 else 0.0
 
 
