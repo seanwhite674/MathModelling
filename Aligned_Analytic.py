@@ -15,7 +15,6 @@ mpl.rcParams.update({
     "mathtext.fontset": "stix",
 })
 
-
 ########################## Fixed model parameters ##############################
 
 alpha_a = 1.0
@@ -27,40 +26,55 @@ k = 500 * np.sqrt(2)
 
 ############################# Helper functions #################################
 
-def g(beta, phi, k):
-    return phi * (beta / k) * np.exp(-(beta / k)**2)
+def p_min(theta, n_p):
+    # Density of minimum of n_p i.i.d. U[0,pi]
+    return n_p * (1/np.pi) * (1 - theta/np.pi)**(n_p - 1)
 
-
-def integrand(theta, n_p):
-    return (1 / np.pi) * np.cos(theta) * (1 - (theta / np.pi))**(n_p - 1)*((np.pi - theta))*(2/np.pi)
-
-def detection(theta, n_p):
-    return (np.pi - theta)*(1 - theta/np.pi)**(n_p-1)
-
-def no_detection(theta, n_p):
-    return (1 - theta/np.pi)**(n_p-1)
-
-
-def Alignment(theta, n_p):
-    return ((np.pi - theta)/np.pi)
-
+def a_raw(theta):
+    # Un-normalised alignment weight (largest at theta=0)
+    return (np.pi - theta)
 
 def compute_DTER(n_p, l_p, g_val, d_crit):
     if l_p < d_crit:
         return 0.0
+
     theta_crit = np.arccos(d_crit / l_p)
-    integral, _ = quad(integrand, 0, theta_crit, args=(n_p,))
-    detection_integral, _ = quad(detection, 0, theta_crit, args=(n_p,)) 
-    no_detection_prob, _ = quad(no_detection, 0, theta_crit, args=(n_p,))
-    prefactor = (1 - no_detection_prob)
-    val, err = quad(Alignment, 0, np.pi, args=(n_p,))
-    no_detection_integral = prefactor * val
-    em = no_detection_integral + detection_integral
-    numerator = g_val * d * n_p * integral
-    denominator = n_p * l_p**2 + alpha_a * n_p**2 * l_p**2 + (2 / np.pi)*em*g_val
+
+    # Detection probability for uniform angles
+    P_det = 1 - (1 - theta_crit/np.pi)**n_p
+
+    # E[a_raw(theta_min) | det] with theta_min truncated to [0, theta_crit]
+    if P_det > 0:
+        num_det, _ = quad(lambda th: a_raw(th) * p_min(th, n_p), 0, theta_crit)
+        E_araw_det = num_det / P_det
+    else:
+        E_araw_det = 0.0
+
+    # E[a_raw(Theta_rand)] with Theta_rand ~ U[0, pi]
+    E_araw_rand, _ = quad(lambda th: a_raw(th) * (1/np.pi), 0, np.pi)
+
+    # Mixture mean under the actual movement rule
+    E_araw_move = P_det * E_araw_det + (1 - P_det) * E_araw_rand
+
+    # Normalise so overall mean step multiplier is 1
+    # (preserves total movement capacity on average)
+    def a(theta):
+        return a_raw(theta) / E_araw_move if E_araw_move != 0 else 0.0
+
+    # Numerator: E[d_x] = g * ∫_{0}^{theta_crit} d*a(theta)*cos(theta)*p_min(theta) dtheta
+    num_int, _ = quad(lambda th: a(th) * np.cos(th) * p_min(th, n_p), 0, theta_crit)
+    numerator = g_val * d * num_int
+
+    # Denominator: membrane costs + movement energy with expected step length
+    # E[d_step] = d * E[a(Theta_move)] = d by construction (because we normalised)
+    d_avg = d
+    denominator = (
+        n_p * l_p**2
+        + alpha_a * n_p**2 * l_p**2
+        + alpha_m * beta * g_val * d_avg
+    )
+
     return numerator / denominator if denominator != 0 else 0.0
-
-
 
 ######################## Detection threshold sweep #############################
 
