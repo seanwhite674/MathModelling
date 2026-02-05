@@ -165,9 +165,9 @@ def main():
         plt.xlabel(r"$l_p$", size=50)
         plt.ylabel(r"$n_p$", rotation=0, size=50, labelpad=50)
         plt.tight_layout()
-        plt.savefig(f"DTER_heatmap_dcrit_{d_crit:.3f}.png", dpi=50)   
+        plt.savefig(f"DTER_Sim_heatmap_dcrit_{d_crit:.3f}.png", dpi=50)   
         plt.close()
 
-        
+
 if __name__ == "__main__":
     main()
