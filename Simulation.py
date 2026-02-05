@@ -17,10 +17,6 @@ mpl.rcParams.update({
     "mathtext.fontset": "stix",
 })
 
-dx = 0.0001
-xs = np.arange(0, 10, dx)
-x0 = 0
-n_steps = 100
 
 alpha_a = 1.0
 alpha_m = 1.0
@@ -36,60 +32,60 @@ def g(beta, phi, k):
     return phi * (beta / k) * np.exp(-(beta / k)**2)
 
 
-def chemotaxis_walk(x0, n_steps, dx, n_p, l_p, d_crit, d, L):
+def chemotaxis_walk(x0,y0,n_steps, dx, n_p, l_p, d_crit, d, L):
 
-    # guard against domain errors in arccos
+    # This is blowing up at certain points need to put if statement here or handle better
     ratio = float(d_crit) / float(l_p)
-    if ratio >= 1.0:
-        thetacrit = 0.0  # no detection possible
-    elif ratio <= -1.0:
-        thetacrit = np.pi
-    else:
-        thetacrit = np.arccos(ratio)
+    thetacrit = np.arccos(ratio)
 
-    x = float(x0)
-    path = [x]
-    nsteps = 0
+    x, y = x0,y0
+    xpath = [x]
+    xypath = [(x, y)]
 
-    while nsteps < n_steps:
+    for _ in range(int(n_steps)):
         # sample angles and choose smallest; ensure n_p >= 1
         thetarand = np.sort(np.random.uniform(0, np.pi, int(max(1, n_p))))
         theta = thetarand[0]
 
         if theta < thetacrit:
             x_new = x + d * np.cos(theta)
+            y_new = y + d* np.sin(theta) 
         else:
             theta = np.random.uniform(0, np.pi)
             x_new = x + d * np.cos(theta)
+            y_new = y + d* np.sin(theta) 
 
         x_grid = dx * np.round(x_new / dx)
-        x_grid = np.clip(x_grid, 0, L)
+        y_grid = dx * np.round(y_new / dx)
 
-        x = x_grid
-        path.append(x)
-        nsteps += 1
+        #x_grid = np.clip(x_grid, 0, L)  ### Think this is causing issues, I want it to move the same number of 100 steps
+        ##y_grid = np.clip(y_grid, 0, L)
 
-    return np.array(path)
+        x, y = x_grid, y_grid
+        xpath.append(x)
+        xypath.append((x, y))
+
+    return np.array(xpath), np.array(xypath)
 
 
-def Edx(x0, n_steps, dx, n_p, l_p, d_crit, d, L):
+def Edx(x0, y0, n_steps, dx, n_p, l_p, d_crit, d, L):
     # Correct argument order (d_crit, d) as expected by chemotaxis_walk
-    path = chemotaxis_walk(x0, n_steps, dx, n_p, l_p, d_crit, d, L)
-    return path[-1] - path[0]
+    xpath,_ = chemotaxis_walk(x0, y0, n_steps, dx, n_p, l_p, d_crit, d, L)
+    return xpath[-1] - xpath[0]
 
 
-def Edx_mean(x0, n_steps, dx, n_p, l_p, d_crit, d, L, n_samples=10, seed=None):
+def Edx_mean(x0,y0, n_steps, dx, n_p, l_p, d_crit, d, L, n_samples=10, seed=None):
 
     rng = np.random.default_rng(seed) if seed is not None else np.random.default_rng()
     displacements = np.zeros(int(n_samples))
     for i in range(int(n_samples)):
         sample_seed = int(rng.integers(0, 2**31 - 1))
         np.random.seed(sample_seed)
-        displacements[i] = Edx(x0, n_steps, dx, n_p, l_p, d_crit, d, L)
+        displacements[i] = Edx(x0,y0, n_steps, dx, n_p, l_p, d_crit, d, L)
     return np.mean(displacements)
 
 
-def denom(n_p, l_p, g_val):
+def Energy(n_p, l_p, g_val):
     return n_p * l_p**2 + alpha_a * n_p**2 * l_p**2 + beta * alpha_m * g_val * d
 
 
@@ -114,15 +110,20 @@ def main():
 
     n_samples = 10        # change to more samples
     seed = 42             # seed default
-    L = 100.0
+    L = 10000.0
+    dx = 0.0001
+    xs = np.arange(0, 10, dx)
+    x0 = 0
+    y0 = 0
+    n_steps = 100
+
 
     for d_crit in np.arange(0.5, 10.0, 1.0):
         DTER_matrix = np.zeros((len(list(n_p_values)), len(list(l_p_values))))
         for i, n_p in enumerate(n_p_values):
             for j, l_p in enumerate(l_p_values):
-                mean_Edx = Edx_mean(x0, n_steps, dx, n_p, l_p, d_crit, d, L,
-                                    n_samples=n_samples, seed=(seed + i * 100 + j))
-                DTER_matrix[i, j] = mean_Edx / denom(n_p, l_p, g_val)
+                mean_Edx = Edx_mean(x0,y0, n_steps, dx, n_p, l_p, d_crit, d, L, n_samples=n_samples, seed=(seed + i * 100 + j))
+                DTER_matrix[i, j] = mean_Edx / Energy(n_p, l_p, g_val)
 
         # Find optimum (use matrix indices)
         max_DTER = np.max(DTER_matrix)
@@ -166,6 +167,20 @@ def main():
         plt.ylabel(r"$n_p$", rotation=0, size=50, labelpad=50)
         plt.tight_layout()
         plt.savefig(f"DTER_Sim_heatmap_dcrit_{d_crit:.3f}.png", dpi=50)   
+        plt.close()
+
+        traj_seed = int(seed + opt_row * 100 + opt_col)
+        np.random.seed(traj_seed)
+        _, xypath = chemotaxis_walk(x0,y0, n_steps, dx, opt_n, opt_l, d_crit, d, L)
+
+        plt.figure(figsize=(8, 4))
+        plt.plot(xypath[:,0], xypath[:,1], '-o', markersize=3)
+        plt.xlabel('x position')
+        plt.ylabel('y position')
+        plt.title(f"Sample trajectory (d_crit={d_crit:.3f}, n_p={opt_n}, l_p={opt_l})")
+        plt.grid(True, linestyle='--', alpha=0.4)
+        plt.tight_layout()
+        plt.savefig(f"Sample_trajectory_dcrit_{d_crit:.3f}_np_{opt_n}_lp_{opt_l}.png", dpi=50)
         plt.close()
 
 
