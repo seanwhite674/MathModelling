@@ -29,8 +29,7 @@ phi = 1.0
 beta = 500.0
 k = 500 * np.sqrt(2)
 
-OUTDIR = "results"
-os.makedirs(OUTDIR, exist_ok=True)
+### np.savetxt
 
 
 def g(beta, phi, k):
@@ -94,35 +93,30 @@ def denom(n_p, l_p, g_val):
     return n_p * l_p**2 + alpha_a * n_p**2 * l_p**2 + beta * alpha_m * g_val * d
 
 
-def parse_args(argv):
-    p = argparse.ArgumentParser(
-        description="DTER sweep — only accepts ranges for n_p, l_p and d_crit (minimal CLI)."
-    )
-    p.add_argument("--n-p", type=int, nargs=2, metavar=("MIN", "MAX"), required=True,
-                   help="n_p range: min max (inclusive).")
-    p.add_argument("--l-p", type=int, nargs=2, metavar=("MIN", "MAX"), required=True,
-                   help="l_p range: min max (inclusive).")
-    p.add_argument("--dcrit", type=float, nargs=2, metavar=("START", "STOP"), required=True,
-                   help="d_crit sweep: start stop step (inclusive if step fits).")
-    return p.parse_args(argv[1:])
+# def parse_args(argv):
+#     p = argparse.ArgumentParser(
+#         description="Takes in n_p, l_p and d_crit."
+#     )
+#     p.add_argument("--n-p", type=int, nargs=2, metavar=("MIN", "MAX"), required=True,
+#                    help="n_p range: min max")
+#     p.add_argument("--l-p", type=int, nargs=2, metavar=("MIN", "MAX"), required=True,
+#                    help="l_p range: min max")
+#     p.add_argument("--dcrit", type=float, nargs=2, metavar=("START", "STOP"), required=True,
+#                    help="d_crit sweep: start stop")
+#     return p.parse_args(argv[1:])
 
 
-def main(argv):
-    args = parse_args(argv)
+def main():
 
-    n_p_min, n_p_max = args.n_p
-    l_p_min, l_p_max = args.l_p
-    dcrit_start, dcrit_stop = args.dcrit
-
-    n_p_values = range(n_p_min, n_p_max + 1)
-    l_p_values = range(l_p_min, l_p_max + 1)
+    n_p_values = range(1, 11)
+    l_p_values = range(1, 11)
     g_val = g(beta, phi, k)
 
     n_samples = 10        # change to more samples
     seed = 42             # seed default
     L = 100.0
 
-    for d_crit in np.arange(dcrit_start, dcrit_stop, 1):
+    for d_crit in np.arange(0.5, 10.0, 1.0):
         DTER_matrix = np.zeros((len(list(n_p_values)), len(list(l_p_values))))
         for i, n_p in enumerate(n_p_values):
             for j, l_p in enumerate(l_p_values):
@@ -160,8 +154,7 @@ def main(argv):
             marker='o',
             markersize=20,
             markerfacecolor='yellow',
-            markeredgecolor='black'
-        )
+            markeredgecolor='black')
 
 
         ax.tick_params(axis='x', labelsize=40)
@@ -172,20 +165,9 @@ def main(argv):
         plt.xlabel(r"$l_p$", size=50)
         plt.ylabel(r"$n_p$", rotation=0, size=50, labelpad=50)
         plt.tight_layout()
-
-        png_name = os.path.join(OUTDIR, f"DTER_heatmap_dcrit_{d_crit:.3f}.png")
-        npz_name = os.path.join(OUTDIR, f"DTER_matrix_dcrit_{d_crit:.3f}.npz")
-        plt.savefig(png_name, dpi=300)   
+        plt.savefig(f"DTER_heatmap_dcrit_{d_crit:.3f}.png", dpi=50)   
         plt.close()
-        np.savez_compressed(npz_name,
-                            DTER_matrix=DTER_matrix,
-                            n_p_values=np.array(list(n_p_values)),
-                            l_p_values=np.array(list(l_p_values)),
-                            d_crit=d_crit)
-        print(f"Saved {png_name} and {npz_name} (opt n_p={opt_n}, l_p={opt_l}, max_DTER={max_DTER:.6e})")
 
-    print("All sweeps done. Results in:", OUTDIR)
-
-
+        
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
